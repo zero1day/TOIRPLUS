@@ -59,18 +59,19 @@ function Zilean:MenuValueDefault()
     self.autoUltAllies = self:MenuBool("autoUltAllies", true)
     self.autoQ = self:MenuSliderInt("Auto2Q (Q + W + Q) if n enemies", 3)
     self.bombtomouse = self:MenuKeyBinding("DoubleBomb to mouse", 90)
-    self.blockR = self:MenuBool("Block Flash when zilean has ult on yourself", true)
+    --self.blockR = self:MenuBool("Block Flash when zilean has ult on yourself", true)
+    self.supportMode = self:MenuBool("Support mode", true)
 end
 
 
 function Zilean:OnDrawMenu()
     if Menu_Begin(self.menu) then
-            self.autoUlt = Menu_SliderInt("AutoUlt if n% hp (0 = off)", self.autoUlt, 0, 100, self.menu)
-            self.autoUltAllies = Menu_Bool("autoUltAllies", self.autoUltAllies, self.menu)
-            self.autoQ = Menu_SliderInt("Auto2Q (Q + W + Q) if n enemies", self.autoQ, 0, 5, self.menu)
-            self.bombtomouse = Menu_KeyBinding("DoubleBomb to mouse", self.bombtomouse, self.menu)
-            self.blockR = Menu_Bool("Block Flash when zilean has ult on yourself", self.blockR, self.menu)
-
+        self.autoUlt = Menu_SliderInt("AutoUlt if n% hp (0 = off)", self.autoUlt, 0, 100, self.menu)
+        self.autoUltAllies = Menu_Bool("autoUltAllies", self.autoUltAllies, self.menu)
+        self.autoQ = Menu_SliderInt("Auto2Q (Q + W + Q) if n enemies", self.autoQ, 0, 5, self.menu)
+        self.bombtomouse = Menu_KeyBinding("DoubleBomb to mouse", self.bombtomouse, self.menu)
+        --self.blockR = Menu_Bool("Block Flash when zilean has ult on yourself", self.blockR, self.menu)
+        self.supportMode = Menu_Bool("Support mode", self.supportMode, self.menu)
         Menu_End()
     end
 end
@@ -95,6 +96,15 @@ function Zilean:MenuKeyBinding(stringKey, valueDefault)
     return ReadIniInteger(self.menu, stringKey, valueDefault)
 end
 
+function Zilean:CanMove(unit)
+    if (unit.MoveSpeed < 50 or CountBuffByType(unit.Addr, 5) == 1 or CountBuffByType(unit.Addr, 21) == 1 or CountBuffByType(unit.Addr, 11) == 1 or CountBuffByType(unit.Addr, 29) == 1 or
+            unit.HasBuff("recall") or CountBuffByType(unit.Addr, 30) == 1 or CountBuffByType(unit.Addr, 22) == 1 or CountBuffByType(unit.Addr, 8) == 1 or CountBuffByType(unit.Addr, 24) == 1
+            or CountBuffByType(unit.Addr, 20) == 1 or CountBuffByType(unit.Addr, 18) == 1) then
+        return false
+    end
+    return true
+end
+
 --endmenu
 
 function Zilean:ComboVombo()
@@ -112,40 +122,62 @@ function Zilean:ComboVombo()
             comboStep = 1
 
         else
-            --todo: give speed to our adc if support mode
-            CastSpellTarget(myHero.Addr, _E)
+            if (self.supportMode) then
+                for i, hero in pairs(GetAllyHeroes()) do
+                    if hero ~= nil then
+                        local ally = GetAIHero(hero)
+                        if not ally.IsMe and not ally.IsDead and GetDistance(ally.Addr) <= self.E.range then
+                            CastSpellTarget(ally.Addr, _E)
+                        end
+                    end
+                end
+            else
+                CastSpellTarget(myHero.Addr, _E)
+            end
         end
 
-    --Combo without E
+        --Combo without E
     elseif (CanCast(_Q) and CanCast(_W) and comboStep == 0) then
         self.Q:Cast(target)
+
         comboStep = 2
 
-    --Lazy combo
+        --Lazy combo
     elseif (CanCast(_Q) and comboStep == 0) then
         self.Q:Cast(target)
 
-    --merged steps
+        --merged steps
     elseif ((CanCast(_W) and comboStep == 1) or (CanCast(_W) and comboStep == 2) or (CanCast(_Q) == false and CanCast(_W) and comboStep == 0)) then
         self.W:Cast(myHero)
         self.Q:Cast(target)
         comboStep = 0
 
     elseif (CanCast(_E)) then
-        self.E:Cast(target) --todo: boost our adc if support mode
+        if (self.supportMode) then
+            for i, hero in pairs(GetAllyHeroes()) do
+                if hero ~= nil then
+                    local ally = GetAIHero(hero)
+                    if not ally.IsMe and not ally.IsDead and GetDistance(ally.Addr) <= self.E.range then
+                        CastSpellTarget(ally.Addr, _E)
+                    end
+                end
+            end
+        else
+            self.E:Cast(target)
+        end
     end
 end
 
 function Zilean:misc()
     --BombToMouse
-    if (GetKeyPress(self.bombtomouse) > 0  and self.bombtomouse and CanCast(_Q) and CanCast(_W)) then
+    if (GetKeyPress(self.bombtomouse) > 0 and self.bombtomouse and CanCast(_Q) and CanCast(_W)) then
         doubleCastpos = GetMousePos()
 
         CastSpellToPos(doubleCastpos.x, doubleCastpos.z, _Q)
 
         isDoubleCast = 1
 
-    elseif(isDoubleCast == 1) then
+    elseif (isDoubleCast == 1) then
         self.W:Cast(myHero)
         CastSpellTarget(doubleCastpos, _Q)
         isDoubleCast = 0
@@ -160,7 +192,7 @@ function Zilean:misc()
         end
 
         if (self.autoUltAllies and CanCast(_R)) then
-            for i,hero in pairs(GetAllyHeroes()) do
+            for i, hero in pairs(GetAllyHeroes()) do
                 if hero ~= nil then
                     local ally = GetAIHero(hero)
                     if not ally.IsMe and not ally.IsDead and GetDistance(ally.Addr) <= self.R.range then
@@ -186,7 +218,6 @@ function Zilean:misc()
             doubleCastpos = target.Addr
 
             isDoubleCast = 1
-
         end
     end
 end
