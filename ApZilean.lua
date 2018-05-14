@@ -96,15 +96,6 @@ function Zilean:MenuKeyBinding(stringKey, valueDefault)
     return ReadIniInteger(self.menu, stringKey, valueDefault)
 end
 
-function Zilean:CanMove(unit)
-    if (unit.MoveSpeed < 50 or CountBuffByType(unit.Addr, 5) == 1 or CountBuffByType(unit.Addr, 21) == 1 or CountBuffByType(unit.Addr, 11) == 1 or CountBuffByType(unit.Addr, 29) == 1 or
-            unit.HasBuff("recall") or CountBuffByType(unit.Addr, 30) == 1 or CountBuffByType(unit.Addr, 22) == 1 or CountBuffByType(unit.Addr, 8) == 1 or CountBuffByType(unit.Addr, 24) == 1
-            or CountBuffByType(unit.Addr, 20) == 1 or CountBuffByType(unit.Addr, 18) == 1) then
-        return false
-    end
-    return true
-end
-
 --endmenu
 
 function Zilean:ComboVombo()
@@ -128,7 +119,11 @@ function Zilean:ComboVombo()
                         local ally = GetAIHero(hero)
                         if not ally.IsMe and not ally.IsDead and GetDistance(ally.Addr) <= self.E.range then
                             CastSpellTarget(ally.Addr, _E)
+                        else
+                            CastSpellTarget(myHero.Addr, _E)
                         end
+                    else
+                        CastSpellTarget(myHero.Addr, _E)
                     end
                 end
             else
@@ -159,7 +154,11 @@ function Zilean:ComboVombo()
                     local ally = GetAIHero(hero)
                     if not ally.IsMe and not ally.IsDead and GetDistance(ally.Addr) <= self.E.range then
                         CastSpellTarget(ally.Addr, _E)
+                    else
+                        self.E:Cast(target)
                     end
+                else
+                    self.E:Cast(target)
                 end
             end
         else
