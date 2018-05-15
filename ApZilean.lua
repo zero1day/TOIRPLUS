@@ -217,7 +217,7 @@ function Zilean:ComboVombo()
         if not self:CanMove(target) then
             CastSpellToPos(target.x, target.z, _Q)
             comboStep = 0
-        elseif HitChance >= 6 then
+        elseif HitChance >= 5 then
             CastSpellToPos(CastPosition.x, CastPosition.z, _Q)
             comboStep = 0
         end
