@@ -48,6 +48,11 @@ function Zilean:__init()
     Callback.Add("Tick", function(...) self:OnTick(...) end)
     Callback.Add("DrawMenu", function(...) self:OnDrawMenu(...) end)
 
+    --[[Callback.Add("RemoveBuff", function(unit, buff) self:OnRemoveBuff(unit, buff) end)
+    Callback.Add("UpdateBuff", function(unit, buff, stacks) self:OnUpdateBuff(source, unit, buff, stacks) end) --]]
+
+    Callback.Add("ProcessSpell", function(unit, spell) self:OnProcessSpell(unit, spell) end)
+
     self:MenuValueDefault()
 end
 
@@ -62,6 +67,27 @@ function Zilean:MenuValueDefault()
     --self.blockR = self:MenuBool("Block Flash when zilean has ult on yourself", true)
     self.supportMode = self:MenuBool("Support mode", true)
 end
+
+function Zilean:OnProcessSpell(unit, spell)
+    if unit.IsMe and spell.Name == 'SummonerFlash' then
+    end
+end
+
+--[[function Zilean:OnUpdateBuff(source, unit, buff, stacks)
+    if unit.IsMe and buff.name == "ChronoShift" then
+
+
+    end
+end
+
+function Zilean:OnRemoveBuff(unit, buff)
+    if unit.IsMe then
+        self.blinks = true
+    end
+end
+--]]
+
+
 
 
 function Zilean:OnDrawMenu()
