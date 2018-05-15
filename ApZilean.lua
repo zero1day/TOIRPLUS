@@ -10,10 +10,6 @@ local function PrintChat(msg)
     return __PrintTextGame("<b><font color='#f1c40f'>[Zilean logs] </font></b><font color='#ecf0f1'>" .. msg .. "</font>")
 end
 
-local function GetTarget(range)
-    return GetEnemyChampCanKillFastest(range)
-end
-
 function OnLoad()
     if GetChampName(GetMyChamp()) == "Zilean" then
         PrintChat("You are welcome!) Good luck boy")
@@ -56,11 +52,34 @@ function Zilean:__init()
     self:MenuValueDefault()
 end
 
+function Zilean:GetQCirclePreCore(target) --NickyJhin credits
+    local castPosX, castPosZ, unitPosX, unitPosZ, hitChance, _aoeTargetsHitCount = GetPredictionCore(target.Addr, 1, self.Q.delay, self.Q.width, self.Q.range, self.Q.speed, myHero.x, myHero.z, false, false, 1, 5, 5, 5, 5, 5)
+    if target ~= nil then
+        CastPosition = Vector(castPosX, target.y, castPosZ)
+        HitChance = hitChance
+        Position = Vector(unitPosX, target.y, unitPosZ)
+        return CastPosition, HitChance, Position
+    end
+    return nil, 0, nil
+end
+
+function Zilean:CanMove(unit) --NickyJhin Credits
+    if (unit.MoveSpeed < 50 or CountBuffByType(unit.Addr, 5) == 1 or CountBuffByType(unit.Addr, 21) == 1 or CountBuffByType(unit.Addr, 11) == 1 or CountBuffByType(unit.Addr, 29) == 1 or
+            unit.HasBuff("recall") or CountBuffByType(unit.Addr, 30) == 1 or CountBuffByType(unit.Addr, 22) == 1 or CountBuffByType(unit.Addr, 8) == 1 or CountBuffByType(unit.Addr, 24) == 1
+            or CountBuffByType(unit.Addr, 20) == 1 or CountBuffByType(unit.Addr, 18) == 1) then
+        return false
+    end
+    return true
+end
+
+
+
+
 --menu
 function Zilean:MenuValueDefault()
 
     self.menu = "ApZilean"
-    self.autoUlt = self:MenuSliderInt("AutoUlt if n% hp (0 = off)", 20)
+    self.autoUlt = self:MenuSliderInt("AutoUlt if n% hp (0 = off)", 25)
     self.autoUltAllies = self:MenuBool("autoUltAllies", true)
     self.autoQ = self:MenuSliderInt("Auto2Q (Q + W + Q) if n enemies", 3)
     self.bombtomouse = self:MenuKeyBinding("DoubleBomb to mouse", 90)
@@ -125,19 +144,31 @@ end
 --endmenu
 
 function Zilean:ComboVombo()
-    local target = GetTarget(901)
+    local target = GetAIHero(GetTargetOrb())
+
 
 
     if IsValidTarget(target, 900) == false or IsCasting(myHero) then return end
     --full combo
     if (CanCast(_Q) and CanCast(_W) and CanCast(_E) and comboStep == 0) then
         if (GetDistance(target) <= 750) then
-            self.E:Cast(target)
+            self.E:Cast(target.Addr)
 
-            self.Q:Cast(target)
+            local CastPosition, HitChance, Position = self:GetQCirclePreCore(target)
 
-            comboStep = 1
+            if not self:CanMove(target) then
+                CastSpellToPos(target.x, target.z, _Q)
+                comboStep = 1
+            elseif HitChance >= 6 then
+                CastSpellToPos(CastPosition.x, CastPosition.z, _Q)
+                comboStep = 1
+            end
 
+
+
+            --self.Q:Cast(target)
+
+            --comboStep = 1
         else
             if (self.supportMode) then
                 for i, hero in pairs(GetAllyHeroes()) do
@@ -156,22 +187,41 @@ function Zilean:ComboVombo()
                 CastSpellTarget(myHero.Addr, _E)
             end
         end
-
         --Combo without E
     elseif (CanCast(_Q) and CanCast(_W) and comboStep == 0) then
-        self.Q:Cast(target)
+        local CastPosition, HitChance, Position = self:GetQCirclePreCore(target)
 
-        comboStep = 2
+        if not self:CanMove(target) then
+            CastSpellToPos(target.x, target.z, _Q)
+            comboStep = 2
+        elseif HitChance >= 6 then
+            CastSpellToPos(CastPosition.x, CastPosition.z, _Q)
+            comboStep = 2
+        end
 
         --Lazy combo
     elseif (CanCast(_Q) and comboStep == 0) then
-        self.Q:Cast(target)
+        local CastPosition, HitChance, Position = self:GetQCirclePreCore(target)
 
+        if not self:CanMove(target) then
+            CastSpellToPos(target.x, target.z, _Q)
+        elseif HitChance >= 6 then
+            CastSpellToPos(CastPosition.x, CastPosition.z, _Q)
+        end
         --merged steps
     elseif ((CanCast(_W) and comboStep == 1) or (CanCast(_W) and comboStep == 2) or (CanCast(_Q) == false and CanCast(_W) and comboStep == 0)) then
         self.W:Cast(myHero)
-        self.Q:Cast(target)
-        comboStep = 0
+
+        local CastPosition, HitChance, Position = self:GetQCirclePreCore(target)
+
+        if not self:CanMove(target) then
+            CastSpellToPos(target.x, target.z, _Q)
+            comboStep = 0
+        elseif HitChance >= 6 then
+            CastSpellToPos(CastPosition.x, CastPosition.z, _Q)
+            comboStep = 0
+        end
+
 
     elseif (CanCast(_E)) then
         if (self.supportMode) then
@@ -181,14 +231,15 @@ function Zilean:ComboVombo()
                     if not ally.IsMe and not ally.IsDead and GetDistance(ally.Addr) <= self.E.range then
                         CastSpellTarget(ally.Addr, _E)
                     else
-                        self.E:Cast(target)
+                        self.E:Cast(target.Addr)
+
                     end
                 else
-                    self.E:Cast(target)
+                    self.E:Cast(target.Addr)
                 end
             end
         else
-            self.E:Cast(target)
+            self.E:Cast(target.Addr)
         end
     end
 end
@@ -233,12 +284,10 @@ function Zilean:misc()
 
     if (GetKeyPress(32) == 0 and self.autoQ and CountEnemyChampAroundObject(myHero.Addr, 880) >= self.autoQ and CanCast(_Q) and CanCast(_W)) then
 
-        local target = GetTarget(880)
+        local target = GetAIHero(GetTargetOrb())
 
         if IsValidTarget(target, 900) then
-            target = GetAIHero(target)
-
-            self.Q:Cast(target)
+            self.Q:Cast(target.Addr)
 
             doubleCastpos = target.Addr
 
