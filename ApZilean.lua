@@ -30,6 +30,10 @@ function Zilean:__init()
 
     isDoubleCast = 0
 
+    immobileQ = 0
+
+    gapclosing = 0
+
     self.Q = Spell(_Q, 880)
     self.W = Spell(_W, 0)
     self.E = Spell(_E, 750)
@@ -44,10 +48,11 @@ function Zilean:__init()
     Callback.Add("Tick", function(...) self:OnTick(...) end)
     Callback.Add("DrawMenu", function(...) self:OnDrawMenu(...) end)
 
+    Callback.Add("ProcessSpell", function(unit, spell) self:OnProcessSpell(unit, spell) end)
+
     --[[Callback.Add("RemoveBuff", function(unit, buff) self:OnRemoveBuff(unit, buff) end)
     Callback.Add("UpdateBuff", function(unit, buff, stacks) self:OnUpdateBuff(source, unit, buff, stacks) end) --]]
 
-    Callback.Add("ProcessSpell", function(unit, spell) self:OnProcessSpell(unit, spell) end)
 
     self:MenuValueDefault()
 end
@@ -72,8 +77,11 @@ function Zilean:CanMove(unit) --NickyJhin Credits
     return true
 end
 
-
-
+function Zilean:OnProcessSpell(unit, spell)
+    if unit.IsMe and spell.Name == 'ZileanW' and gapclosing == 1 then
+        gapclosing = 0
+    end
+end
 
 --menu
 function Zilean:MenuValueDefault()
@@ -81,24 +89,19 @@ function Zilean:MenuValueDefault()
     self.menu = "ApZilean"
     self.autoUlt = self:MenuSliderInt("AutoUlt if n% hp (0 = off)", 25)
     self.autoUltAllies = self:MenuBool("autoUltAllies", true)
+    self.immobile = self:MenuBool("Auto2Q Immobile targets", true)
     self.autoQ = self:MenuSliderInt("Auto2Q (Q + W + Q) if n enemies", 3)
-    self.bombtomouse = self:MenuKeyBinding("DoubleBomb to mouse", 90)
+    self.flee = self:MenuKeyBinding("Flee", 90)
+    self.bombtomouse = self:MenuKeyBinding("Q To Mouse", 84)
+    self.antigap = self:MenuBool("Antigapcloser", true)
     --self.blockR = self:MenuBool("Block Flash when zilean has ult on yourself", true)
     self.supportMode = self:MenuBool("Support mode", true)
 end
 
-function Zilean:OnProcessSpell(unit, spell)
-    if unit.IsMe and spell.Name == 'SummonerFlash' then
-    end
-end
-
 --[[function Zilean:OnUpdateBuff(source, unit, buff, stacks)
     if unit.IsMe and buff.name == "ChronoShift" then
-
-
     end
 end
-
 function Zilean:OnRemoveBuff(unit, buff)
     if unit.IsMe then
         self.blinks = true
@@ -113,8 +116,11 @@ function Zilean:OnDrawMenu()
     if Menu_Begin(self.menu) then
         self.autoUlt = Menu_SliderInt("AutoUlt if n% hp (0 = off)", self.autoUlt, 0, 100, self.menu)
         self.autoUltAllies = Menu_Bool("autoUltAllies", self.autoUltAllies, self.menu)
+        self.immobile = Menu_Bool("Auto2Q Immobile targets", self.immobile, self.menu)
         self.autoQ = Menu_SliderInt("Auto2Q (Q + W + Q) if n enemies", self.autoQ, 0, 5, self.menu)
+        self.flee = Menu_KeyBinding("Flee", self.flee, self.menu)
         self.bombtomouse = Menu_KeyBinding("DoubleBomb to mouse", self.bombtomouse, self.menu)
+        self.antigap = Menu_Bool("Antigapcloser", self.antigap, self.menu)
         --self.blockR = Menu_Bool("Block Flash when zilean has ult on yourself", self.blockR, self.menu)
         self.supportMode = Menu_Bool("Support mode", self.supportMode, self.menu)
         Menu_End()
@@ -210,7 +216,7 @@ function Zilean:ComboVombo()
         end
         --merged steps
     elseif ((CanCast(_W) and comboStep == 1) or (CanCast(_W) and comboStep == 2) or (CanCast(_Q) == false and CanCast(_W) and comboStep == 0)) then
-        self.W:Cast(myHero)
+        self.W:Cast(myHero.Addr)
 
         local CastPosition, HitChance, Position = self:GetQCirclePreCore(target)
 
@@ -232,7 +238,6 @@ function Zilean:ComboVombo()
                         CastSpellTarget(ally.Addr, _E)
                     else
                         self.E:Cast(target.Addr)
-
                     end
                 else
                     self.E:Cast(target.Addr)
@@ -244,9 +249,36 @@ function Zilean:ComboVombo()
     end
 end
 
+function Zilean:AntiGapCloser() --credits to NickyJhin
+
+    for i, heros in pairs(GetEnemyHeroes()) do
+        if heros ~= nil then
+            local hero = GetAIHero(heros)
+            local TargetDashing, CanHitDashing, DashPosition = vpred:IsDashing(hero, 0.09, 65, 2000, myHero, false)
+            local myHeroPos = Vector(myHero.x, myHero.y, myHero.z)
+
+            if DashPosition ~= nil then
+                if GetDistance(DashPosition) < self.Q.range and CanCast(_Q) and CanCast(_W) then
+                    CastSpellToPos(DashPosition.x, DashPosition.z, _Q)
+                    gapclosing = 1
+                    gapposition = DashPosition
+                end
+            end
+            --end
+        end
+    end
+
+    if (gapclosing == 1) then
+        self.W:Cast(myHero.Addr)
+        CastSpellToPos(gapposition.x, gapposition.z, _Q)
+    end
+end
+
 function Zilean:misc()
+    if (self.antigap) then self:AntiGapCloser() end
+
     --BombToMouse
-    if (GetKeyPress(self.bombtomouse) > 0 and self.bombtomouse and CanCast(_Q) and CanCast(_W)) then
+    if (GetKeyPress(self.bombtomouse) > 0 and CanCast(_Q) and CanCast(_W)) then
         doubleCastpos = GetMousePos()
 
         CastSpellToPos(doubleCastpos.x, doubleCastpos.z, _Q)
@@ -254,9 +286,37 @@ function Zilean:misc()
         isDoubleCast = 1
 
     elseif (isDoubleCast == 1) then
-        self.W:Cast(myHero)
+        self.W:Cast(myHero.Addr)
         CastSpellTarget(doubleCastpos, _Q)
         isDoubleCast = 0
+    end
+
+    if (GetKeyPress(self.flee) > 0) then
+        local mousePos = Vector(GetMousePos())
+        MoveToPos(GetMousePosX(), GetMousePosZ())
+        if (CanCast(_E)) then CastSpellTarget(myHero.Addr, _E) end
+        if (CanCast(_W)) then CastSpellTarget(myHero.Addr, _W) end
+    end
+
+    if (self.immobile) then
+        if (immobileQ == 1) then
+            CastSpellTarget(myHero.Addr, _W)
+            CastSpellToPos(immobilePos.x, immobilePos.z, _Q)
+            immobileQ = 0
+        else
+            local t = GetEnemyHeroes()
+
+            for k, v in pairs(t) do
+                local enemy = GetAIHero(v)
+                if enemy ~= 0 then
+                    if GetDistance(enemy) < self.Q.range and self:CanMove(enemy) == false and self.Q:IsReady() and self.W:IsReady() then
+                        CastSpellToPos(enemy.x, enemy.z, _Q)
+                        immobileQ = 1
+                        immobilePos = enemy
+                    end
+                end
+            end
+        end
     end
 
     --AutoUlt me and allies
@@ -311,6 +371,3 @@ function Zilean:OnTick()
         self:ComboVombo()
     end
 end
-
-
-
